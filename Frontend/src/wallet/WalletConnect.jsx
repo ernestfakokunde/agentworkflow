@@ -1,5 +1,5 @@
-import { useCurrentAccount } from '@mysten/dapp-kit'
-import { ConnectButton } from '@mysten/dapp-kit'
+import { useCurrentAccount, useCurrentNetwork, useCurrentWallet } from '@mysten/dapp-kit-react'
+import { ConnectButton } from '@mysten/dapp-kit-react/ui'
 
 function shortenAddress(address) {
   if (!address) {
@@ -11,6 +11,8 @@ function shortenAddress(address) {
 
 export function WalletConnect() {
   const account = useCurrentAccount()
+  const wallet = useCurrentWallet()
+  const network = useCurrentNetwork()
 
   return (
     <div className="wallet-cluster" aria-label="Sui wallet connection">
@@ -19,7 +21,9 @@ export function WalletConnect() {
           <span className="wallet-dot connected" aria-hidden="true" />
           <span>
             <strong>{shortenAddress(account.address)}</strong>
-            <small>Sui Wallet Connected</small>
+            <small>
+              {wallet?.name || 'Sui wallet'} / {network}
+            </small>
           </span>
         </div>
       ) : (
@@ -27,11 +31,11 @@ export function WalletConnect() {
           <span className="wallet-dot" aria-hidden="true" />
           <span>
             <strong>Wallet required</strong>
-            <small>Connect to create signed workflows</small>
+            <small>Connect to sign workflows</small>
           </span>
         </div>
       )}
-      <ConnectButton />
+      <ConnectButton className="sui-connect-button" />
     </div>
   )
 }

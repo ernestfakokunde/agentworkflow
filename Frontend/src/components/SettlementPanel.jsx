@@ -19,12 +19,13 @@ export function SettlementPanel({ settlement }) {
       </div>
 
       <div className="settlement-amount">
-        <span>Escrow locked</span>
+        <span>Vault funded</span>
         <strong>{settlement.amount}</strong>
       </div>
 
       <p className="settlement-note">
-        Escrow is locked value reserved for the agents and released only after validation completes.
+        Testnet USDC was transferred from the connected wallet into the Sui vault before agents ran.
+        {settlement.digest ? ` Digest: ${settlement.digest.slice(0, 12)}...` : ''}
       </p>
 
       <div className="settlement-grid">

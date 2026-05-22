@@ -4,7 +4,7 @@ export async function deployPortfolioAllocation(
   taskId,
   amount,
   aiStrategyOutput,
-  escrowCoinId,
+  vaultDepositDigest,
   packageId
 ) {
   try {
@@ -37,21 +37,21 @@ export async function deployPortfolioAllocation(
       Aftermath: Math.round((amount * normalized.Aftermath) / 100)
     }
 
-    // Build PTB
-    const ptb = buildDeploymentPTB(
+    const executionPlan = buildDeploymentPTB(
       taskId,
       normalized,
-      escrowCoinId,
+      vaultDepositDigest,
       packageId
     )
 
     return {
       taskId,
       amount,
+      vaultDepositDigest,
       allocations: normalized,
       amounts,
-      ptb,
-      status: 'ready_for_signature',
+      executionPlan,
+      status: 'strategy_generated_after_deposit',
       createdAt: new Date().toISOString()
     }
   } catch (error) {

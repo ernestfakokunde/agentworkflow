@@ -6,15 +6,12 @@ module aether_portfolio_vault::portfolio_vault {
     use sui::transfer;
     use sui::tx_context::{Self, TxContext};
 
-    // Test USDC coin for testnet
-    public struct USDC has copy, drop {}
-
     /// Portfolio allocation configuration
-    public struct PortfolioAllocation has key, store {
+    public struct PortfolioAllocation<phantom CoinType> has key, store {
         id: UID,
         owner: address,
         task_id: address,
-        total_balance: Balance<USDC>,
+        total_balance: Balance<CoinType>,
         allocations: vector<AllocationEntry>,
         version: u64,
         created_at: u64,
@@ -30,11 +27,11 @@ module aether_portfolio_vault::portfolio_vault {
     }
 
     /// Vault position in a protocol
-    public struct VaultPosition has key, store {
+    public struct VaultPosition<phantom CoinType> has key, store {
         id: UID,
         portfolio_id: address,
         protocol: vector<u8>,
-        amount: Balance<USDC>,
+        amount: Balance<CoinType>,
         yield_earned: u64,
         entry_block: u64,
     }
@@ -73,19 +70,19 @@ module aether_portfolio_vault::portfolio_vault {
     }
 
     /// Create a new portfolio with initial USDC deposit
-    public fun create_portfolio(
+    public fun create_portfolio<CoinType>(
         task_id: address,
-        usdc_coin: Coin<USDC>,
+        deposit_coin: Coin<CoinType>,
         ctx: &mut TxContext,
-    ): PortfolioAllocation {
-        let amount = coin::value(&usdc_coin);
+    ): PortfolioAllocation<CoinType> {
+        let amount = coin::value(&deposit_coin);
         let owner = tx_context::sender(ctx);
 
         let portfolio = PortfolioAllocation {
             id: object::new(ctx),
             owner,
             task_id,
-            total_balance: coin::into_balance(usdc_coin),
+            total_balance: coin::into_balance(deposit_coin),
             allocations: vector[],
             version: 0,
             created_at: tx_context::epoch(ctx),
@@ -106,8 +103,8 @@ module aether_portfolio_vault::portfolio_vault {
     /// Set allocation percentages for each protocol
     /// percentages should be a vector of 4 values (navi, scallop, cetus, aftermath)
     /// each value is in basis points (10000 = 100%)
-    public fun set_allocations(
-        portfolio: &mut PortfolioAllocation,
+    public fun set_allocations<CoinType>(
+        portfolio: &mut PortfolioAllocation<CoinType>,
         protocols: vector<vector<u8>>,
         percentages: vector<u64>,
         ctx: &mut TxContext,
@@ -144,11 +141,11 @@ module aether_portfolio_vault::portfolio_vault {
     }
 
     /// Create a vault position for a specific protocol allocation
-    public fun create_position(
-        portfolio: &mut PortfolioAllocation,
+    public fun create_position<CoinType>(
+        portfolio: &mut PortfolioAllocation<CoinType>,
         protocol_index: u64,
         ctx: &mut TxContext,
-    ): VaultPosition {
+    ): VaultPosition<CoinType> {
         assert!(protocol_index < vector::length(&portfolio.allocations), 4); // E_INVALID_PROTOCOL
         
         let allocation = vector::borrow_mut(&mut portfolio.allocations, protocol_index);
@@ -181,15 +178,15 @@ module aether_portfolio_vault::portfolio_vault {
     }
 
     /// Record yield earned on a position
-    public fun record_yield(position: &mut VaultPosition, yield_amount: u64) {
+    public fun record_yield<CoinType>(position: &mut VaultPosition<CoinType>, yield_amount: u64) {
         position.yield_earned = position.yield_earned + yield_amount;
     }
 
     /// Withdraw from a position
-    public fun withdraw_position(
-        position: VaultPosition,
+    public fun withdraw_position<CoinType>(
+        position: VaultPosition<CoinType>,
         ctx: &mut TxContext,
-    ): Coin<USDC> {
+    ): Coin<CoinType> {
         let VaultPosition {
             id,
             portfolio_id,
@@ -215,12 +212,12 @@ module aether_portfolio_vault::portfolio_vault {
     }
 
     /// Get total portfolio value (balance + yield)
-    public fun portfolio_value(portfolio: &PortfolioAllocation): u64 {
+    public fun portfolio_value<CoinType>(portfolio: &PortfolioAllocation<CoinType>): u64 {
         balance::value(&portfolio.total_balance)
     }
 
     /// Get allocation count
-    public fun allocation_count(portfolio: &PortfolioAllocation): u64 {
+    public fun allocation_count<CoinType>(portfolio: &PortfolioAllocation<CoinType>): u64 {
         vector::length(&portfolio.allocations)
     }
 }

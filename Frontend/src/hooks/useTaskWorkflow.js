@@ -1,125 +1,220 @@
-import { useState, useCallback, useEffect } from 'react'
-import { useCurrentAccount } from '@mysten/dapp-kit'
+import { useEffect, useMemo, useState } from 'react'
+import { createWorkflowTask, fetchPortfolioSnapshot, fetchTaskStatus } from '../services/aetherApi'
 
-const BACKEND_URL = 'http://localhost:4000'
+const agentDefaults = [
+  {
+    initials: 'RA',
+    name: 'Research Agent',
+    role: 'Collects market, protocol, and opportunity context.',
+  },
+  {
+    initials: 'SA',
+    name: 'Strategy Agent',
+    role: 'Converts evidence into an execution strategy.',
+  },
+  {
+    initials: 'VA',
+    name: 'Validation Agent',
+    role: 'Checks quality, risk, and coherence before settlement.',
+  },
+  {
+    initials: 'EA',
+    name: 'Execution Agent',
+    role: 'Packages final output and completion proof.',
+  },
+]
 
 export function useTaskWorkflow() {
-  const account = useCurrentAccount()
-  const [portfolio, setPortfolio] = useState(null)
-  const [error, setError] = useState(null)
-  const [isRunning, setIsRunning] = useState(false)
   const [task, setTask] = useState(null)
-  const [workflowEvents, setWorkflowEvents] = useState([])
-  const [memoryRecords, setMemoryRecords] = useState([])
-  const [proofs, setProofs] = useState([])
-  const [reputationEvents, setReputationEvents] = useState([])
-  const [agents, setAgents] = useState([])
-  const [settlement, setSettlement] = useState(null)
+  const [portfolio, setPortfolio] = useState(null)
+  const [error, setError] = useState('')
+  const [isRunning, setIsRunning] = useState(false)
 
-  // Fetch portfolio data
-  const fetchPortfolio = useCallback(async () => {
-    try {
-      const response = await fetch(`${BACKEND_URL}/api/portfolio`)
-      if (!response.ok) throw new Error('Failed to fetch portfolio')
-      const data = await response.json()
-      setPortfolio(data)
-    } catch (err) {
-      setError(err.message)
+  useEffect(() => {
+    let mounted = true
+
+    fetchPortfolioSnapshot()
+      .then((snapshot) => {
+        if (mounted) setPortfolio(snapshot)
+      })
+      .catch((portfolioError) => {
+        if (mounted) setError(portfolioError.message || 'Failed to load portfolio.')
+      })
+
+    return () => {
+      mounted = false
     }
   }, [])
 
-  // Launch workflow
-  const launchWorkflow = useCallback(
-    async (taskData) => {
-      if (!account) {
-        setError('Wallet connection required')
-        return
-      }
+  async function launchWorkflow(input) {
+    setError('')
+    setIsRunning(true)
 
-      setIsRunning(true)
-      setError(null)
-      setWorkflowEvents([])
-
-      try {
-        const response = await fetch(`${BACKEND_URL}/api/tasks`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...taskData,
-            walletAddress: account.address
-          })
-        })
-
-        if (!response.ok) throw new Error('Failed to create task')
-        const newTask = await response.json()
-        setTask(newTask)
-
-        // Add workflow event
-        setWorkflowEvents((prev) => [
-          ...prev,
-          {
-            id: Date.now(),
-            step: 'Portfolio Created',
-            status: 'success',
-            timestamp: new Date().toISOString()
-          }
-        ])
-
-        // Poll for task status
-        const pollInterval = setInterval(async () => {
-          try {
-            const statusResponse = await fetch(
-              `${BACKEND_URL}/api/tasks/${newTask.id}`
-            )
-            if (statusResponse.ok) {
-              const updatedTask = await statusResponse.json()
-              setTask(updatedTask)
-
-              if (
-                updatedTask.status === 'deployed' ||
-                updatedTask.status === 'settled'
-              ) {
-                clearInterval(pollInterval)
-                setIsRunning(false)
-                setWorkflowEvents((prev) => [
-                  ...prev,
-                  {
-                    id: Date.now(),
-                    step: 'Workflow Complete',
-                    status: 'success',
-                    timestamp: new Date().toISOString()
-                  }
-                ])
-              }
-            }
-          } catch (err) {
-            console.error('Status poll error:', err)
-          }
-        }, 2000)
-      } catch (err) {
-        setError(err.message)
+    try {
+      const nextTask = await createWorkflowTask(input)
+      setTask(nextTask)
+      if (nextTask.status === 'pending') {
+        pollTask(nextTask.id)
+      } else {
         setIsRunning(false)
       }
-    },
-    [account]
-  )
+      return nextTask
+    } catch (workflowError) {
+      setError(workflowError.message || 'Workflow failed.')
+      setIsRunning(false)
+      throw workflowError
+    }
+  }
 
-  // Fetch portfolio on mount
-  useEffect(() => {
-    fetchPortfolio()
-  }, [fetchPortfolio])
+  const mapped = useMemo(
+    () => ({
+      workflowEvents: mapWorkflowEvents(task),
+      agents: mapAgents(task),
+      memoryRecords: mapMemoryRecords(task),
+      reputationEvents: mapReputationEvents(task),
+      settlement: mapSettlement(task),
+    }),
+    [task],
+  )
 
   return {
     portfolio,
+    task,
     error,
     isRunning,
-    task,
-    workflowEvents,
-    memoryRecords,
-    proofs,
-    reputationEvents,
-    agents,
-    settlement,
-    launchWorkflow
+    launchWorkflow,
+    ...mapped,
   }
+
+  async function pollTask(taskId) {
+    const maxAttempts = 12
+
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      await wait(1800)
+      let updatedTask
+
+      try {
+        updatedTask = await fetchTaskStatus(taskId)
+        setTask(updatedTask)
+      } catch (pollError) {
+        setError(pollError.message || 'Failed to refresh task status.')
+        setIsRunning(false)
+        return
+      }
+
+      if (['deployed', 'settled', 'failed'].includes(updatedTask.status)) {
+        setIsRunning(false)
+        return
+      }
+    }
+
+    setIsRunning(false)
+  }
+}
+
+function mapWorkflowEvents(task) {
+  if (!task) return []
+
+  const events = [
+    {
+      id: '01',
+      title: 'Vault task created',
+      description: task.objectives || task.objective || 'Portfolio allocation objective received.',
+      meta: createAnchorMeta(task),
+      status: task.status === 'failed' ? 'queued' : 'complete',
+    },
+  ]
+
+  task.workflowEvents?.forEach((step, index) => {
+    events.push({
+      id: String(index + 2).padStart(2, '0'),
+      title: `${step.agent} ${step.status}`,
+      description: `${step.agent} processed the vault allocation workflow.`,
+      meta: step.timestamp || task.updatedAt || task.createdAt,
+      status: step.status === 'complete' ? 'complete' : 'active',
+    })
+  })
+
+  if (task.deployment) {
+    events.push({
+      id: String(events.length + 1).padStart(2, '0'),
+      title: 'Vault strategy generated',
+      description: 'Agents generated allocations after the wallet-funded vault deposit settled.',
+      meta: task.deployment.status,
+      status: task.status === 'failed' ? 'queued' : 'complete',
+    })
+  }
+
+  return events
+}
+
+function mapAgents(task) {
+  return agentDefaults.map((agent) => {
+    const step = task?.workflowEvents?.find((item) => item.agent === agent.name)
+
+    return {
+      ...agent,
+      state: step ? 'Complete' : task ? 'Queued' : 'Idle',
+      progress: step ? 100 : task ? 25 : 0,
+      output: step ? step.status : '',
+    }
+  })
+}
+
+function mapMemoryRecords(task) {
+  if (!task?.deployment) return []
+
+  return [
+    {
+      id: task.deployment.taskId || task.id,
+      type: 'deployment-ptb',
+      description: `${task.deployment.status} / ${JSON.stringify(task.deployment.allocations)}`,
+    },
+  ]
+}
+
+function mapReputationEvents(task) {
+  return (
+    task?.workflowEvents?.map((event) => ({
+      label: event.agent,
+      value: event.status,
+    })) || []
+  )
+}
+
+function mapSettlement(task) {
+  if (!task?.deployment) return null
+
+  return {
+    amount: `${task.deployment.amount || task.amount} USDC`,
+    digest: task.vaultDeposit?.digest || task.chainProof?.digest,
+    splits: [
+      { agent: 'Research', amount: '25%' },
+      { agent: 'Strategy', amount: '35%' },
+      { agent: 'Validation', amount: '20%' },
+      { agent: 'Execution', amount: '20%' },
+    ],
+  }
+}
+
+function createAnchorMeta(task) {
+  const owner = task.walletAddress || task.ownerAddress || 'demo-wallet'
+  const digest = task.chainProof?.digest
+
+  if (digest) {
+    return `Owner: ${shorten(owner)} / Vault deposit: ${shorten(digest)}`
+  }
+
+  return `Owner: ${shorten(owner)} / Waiting for vault deposit`
+}
+
+function wait(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms)
+  })
+}
+
+function shorten(value) {
+  if (!value || value.length < 14) return value || ''
+  return `${value.slice(0, 6)}...${value.slice(-4)}`
 }

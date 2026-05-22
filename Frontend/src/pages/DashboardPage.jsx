@@ -4,14 +4,14 @@ import { PortfolioOverviewPanel } from '../components/PortfolioOverviewPanel'
 import { SignalsPanel } from '../components/SignalsPanel'
 import { WithdrawalPanel } from '../components/WithdrawalPanel'
 import { YieldSourcesPanel } from '../components/YieldSourcesPanel'
-import { createWorkflowTask, fetchPortfolioSnapshot } from '../services/aetherApi'
-import { useCurrentAccount, useSuiClient } from '@mysten/dapp-kit'
+import { createWorkflowTask } from '../services/aetherApi'
+import { useCurrentAccount, useDAppKit } from '@mysten/dapp-kit-react'
 import { executeVaultDepositPTB, executeVaultWithdrawPTB } from '../wallet/suiTransactions'
 
 export function DashboardPage({ workflow }) {
   const portfolio = workflow.portfolio
   const account = useCurrentAccount()
-  const suiClient = useSuiClient()
+  const dAppKit = useDAppKit()
   const [yieldForecast, setYieldForecast] = useState(null)
   const [riskProfile, setRiskProfile] = useState(null)
   const [vaultPositions, setVaultPositions] = useState([])
@@ -67,11 +67,27 @@ export function DashboardPage({ workflow }) {
 
   async function handleProtocolAction(protocol) {
     try {
-      const ownerAddress = account?.address || '0x' + 'a'.repeat(64)
+      if (!account) {
+        alert('Connect wallet to deposit before agents run')
+        return
+      }
+
+      const amount = Math.max(1, Math.round((portfolio?.tvl?.amount || 1000) * 0.01))
+      const vaultDeposit = await executeVaultDepositPTB({
+        dAppKit,
+        ownerAddress: account.address,
+        amount,
+        taskAnchorAddress: account.address,
+      })
+
       const task = await createWorkflowTask({
-        objective: `Quick action: ${protocol.action} allocation for ${protocol.name}`,
-        escrowAmount: '1.00 USDC',
-        ownerAddress,
+        amount,
+        riskProfile: riskProfile?.riskLevel?.toLowerCase() || 'balanced',
+        objectives: `Quick action: ${protocol.action} allocation for ${protocol.name}`,
+        walletAddress: account.address,
+        ownerAddress: account.address,
+        chainProof: vaultDeposit,
+        vaultDeposit,
       })
       console.log('Action task created', task)
       alert(`Action task created: ${task.id}`)
@@ -133,18 +149,28 @@ export function DashboardPage({ workflow }) {
         return
       }
 
-      const depositAmount = (portfolio.tvl.amount * protocol.allocationPct) / 100
-
-      const execution = await executeVaultDepositPTB({
+      const portfolioAmount = Number(portfolio?.tvl?.amount || 1000)
+      const allocationPct = Number(protocol.allocationPct || 1)
+      const depositAmount = Math.max(1, Math.round((portfolioAmount * allocationPct) / 100))
+      const vaultDeposit = await executeVaultDepositPTB({
         dAppKit,
         ownerAddress: account.address,
-        protocolId: protocol.id,
         amount: depositAmount,
-        allowDemoFallback: false,
+        taskAnchorAddress: account.address,
       })
 
-      console.log('Deposit executed:', execution)
-      alert(`Deposit submitted. Digest: ${execution.digest || 'pending'}`)
+      const depositTask = await createWorkflowTask({
+        amount: depositAmount,
+        riskProfile: riskProfile?.riskLevel?.toLowerCase() || 'balanced',
+        objectives: `Deposit ${depositAmount} into ${protocol.name} using the vault strategy.`,
+        walletAddress: account.address,
+        ownerAddress: account.address,
+        chainProof: vaultDeposit,
+        vaultDeposit,
+      })
+
+      console.log('Deposit executed:', vaultDeposit, depositTask)
+      alert(`Deposit workflow created: ${depositTask.id}`)
     } catch (err) {
       console.error('Deposit failed', err)
       alert('Deposit failed: ' + err.message)

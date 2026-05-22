@@ -1,26 +1,24 @@
-// Sui Transaction builders
-// Note: In production, use actual @mysten/sui imports
-// For demo, we mock the PTB construction
+// Sui deployment plan helpers. Wallet-signed vault funding happens in the frontend
+// so the user's USDC is debited by Sui before the agents run.
 
-export function buildDeploymentPTB(taskId, allocations, escrowCoinId, packageId) {
+export function buildDeploymentPTB(taskId, allocations, vaultDepositDigest, packageId) {
   try {
     if (!packageId) {
       throw new Error('Portfolio vault package ID is required')
     }
 
-    // Mock PTB object for demo
-    const ptb = {
+    const plan = {
       id: taskId,
-      type: 'deployment',
-      escrowCoinId,
+      type: 'funded-vault-strategy',
+      vaultDepositDigest,
       packageId,
       allocations,
       timestamp: new Date().toISOString()
     }
 
-    return ptb
+    return plan
   } catch (error) {
-    console.error('PTB build error:', error)
+    console.error('Deployment plan build error:', error)
     throw error
   }
 }

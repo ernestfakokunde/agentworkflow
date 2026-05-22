@@ -156,11 +156,36 @@
   box-shadow: 0 0 18px rgba(25, 211, 197, 0.9);
 }
 
+/* @mysten/dapp-kit styling */
+[data-testid="connect-button"],
+.sui-connect-button button {
+  min-height: 42px !important;
+  padding: 0 16px !important;
+  border-radius: 8px !important;
+  font-size: 14px !important;
+  border: 1px solid rgba(25, 211, 197, 0.36) !important;
+  background: linear-gradient(135deg, rgba(76, 162, 255, 0.1), rgba(0, 223, 162, 0.08)) !important;
+  color: var(--cyan) !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+[data-testid="connect-button"]:hover,
+.sui-connect-button button:hover {
+  background: linear-gradient(135deg, rgba(76, 162, 255, 0.2), rgba(0, 223, 162, 0.15)) !important;
+  border-color: rgba(25, 211, 197, 0.6) !important;
+  box-shadow: 0 0 16px rgba(76, 162, 255, 0.3) !important;
+}
+
+[data-testid="connect-button"]:active,
+.sui-connect-button button:active {
+  transform: scale(0.98) !important;
+}
+
 .sui-connect-button {
-  --dapp-kit-colors-primaryButton: var(--cyan);
-  --dapp-kit-colors-primaryButtonForeground: #03110f;
-  --dapp-kit-colors-buttonOutline: rgba(25, 211, 197, 0.36);
-  --dapp-kit-radii-button: 8px;
+  display: flex;
+  align-items: center;
 }
 
 .hero-panel {
@@ -1173,7 +1198,8 @@ h1 {
 }
 
 textarea,
-input {
+input,
+select {
   width: 100%;
   box-sizing: border-box;
   border: 1px solid var(--border);
@@ -1190,7 +1216,8 @@ textarea {
   line-height: 1.55;
 }
 
-input {
+input,
+select {
   min-height: 42px;
   padding: 0 12px;
 }

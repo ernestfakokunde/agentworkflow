@@ -1,20 +1,15 @@
-import { createSuiClient } from '@mysten/sui'
+import { createDAppKit } from '@mysten/dapp-kit-react'
+import { SuiGrpcClient } from '@mysten/sui/grpc'
 
-// Initialize the Sui client for testnet
-const client = createSuiClient({
-  rpcUrl: 'https://fullnode.testnet.sui.io:443'
-})
-
-export const dAppKit = {
-  client,
-  chains: [
-    {
-      id: 'sui:testnet',
-      name: 'Sui Testnet',
-      rpcUrl: 'https://fullnode.testnet.sui.io:443'
-    }
-  ],
-  providers: ['Sui Wallet', 'Ethos Wallet']
+const GRPC_URLS = {
+  testnet: 'https://fullnode.testnet.sui.io:443',
 }
 
-export default dAppKit
+export const dAppKit = createDAppKit({
+  networks: ['testnet'],
+  createClient: (network) =>
+    new SuiGrpcClient({
+      network,
+      baseUrl: GRPC_URLS[network],
+    }),
+})

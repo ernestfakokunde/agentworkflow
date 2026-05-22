@@ -1,3 +1,4 @@
+import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
 import fetch from 'node-fetch'
@@ -42,11 +43,18 @@ app.get('/api/portfolio', async (req, res) => {
 // Create new task
 app.post('/api/tasks', async (req, res) => {
   try {
-    const { amount, riskProfile, objectives, walletAddress } = req.body
+    const { amount, riskProfile, objectives, walletAddress, chainProof, vaultDeposit } = req.body
 
     if (!amount || !riskProfile || !walletAddress) {
       return res.status(400).json({
         error: 'Missing required fields: amount, riskProfile, walletAddress'
+      })
+    }
+
+    const depositProof = vaultDeposit || chainProof
+    if (!depositProof || depositProof.mode !== 'sui' || !depositProof.digest) {
+      return res.status(400).json({
+        error: 'A successful Sui vault deposit digest is required before agents run'
       })
     }
 
@@ -57,6 +65,8 @@ app.post('/api/tasks', async (req, res) => {
       riskProfile,
       objectives,
       walletAddress,
+      chainProof: depositProof,
+      vaultDeposit: depositProof,
       status: 'pending',
       createdAt: new Date().toISOString(),
       workflowEvents: [],

@@ -1,53 +1,53 @@
-import { useCurrentAccount, useSuiClient } from '@mysten/dapp-kit'
+import { useCurrentAccount, useDAppKit } from '@mysten/dapp-kit-react'
 import { useState } from 'react'
-import { createTaskOnchain, hasTaskManagerPackage } from '../wallet/suiTransactions'
+import { executeVaultDepositPTB, hasVaultDepositConfig } from '../wallet/suiTransactions'
 
 export function TaskComposer({ error, isRunning, latestTask, onCompleted, onLaunch }) {
   const account = useCurrentAccount()
-  const suiClient = useSuiClient()
+  const dAppKit = useDAppKit()
   const [objective, setObjective] = useState(
     'Maximize yield across Sui DeFi (NAVI, Scallop, Cetus) for a stablecoin portfolio.',
   )
   const [escrowAmount, setEscrowAmount] = useState('5000.00 USDC')
+  const [riskProfile, setRiskProfile] = useState('balanced')
   const [chainStatus, setChainStatus] = useState('')
   const [localError, setLocalError] = useState('')
   const [isSigning, setIsSigning] = useState(false)
-  const allowDemoFallback = import.meta.env.VITE_ALLOW_DEMO_FALLBACK !== 'false'
 
   async function handleSubmit(event) {
     event.preventDefault()
 
     setLocalError('')
     setIsSigning(true)
-    if (!hasTaskManagerPackage()) {
-      setChainStatus('Running in demo mode.')
-    } else if (!account?.address && allowDemoFallback) {
-      setChainStatus('Wallet not connected. Demo fallback enabled.')
-    } else {
-      setChainStatus('Requesting Sui signature...')
-    }
+    setChainStatus('Requesting Sui vault deposit signature...')
 
     try {
-      const chainProof = await createTaskOnchain({
-        dAppKit,
-        objective,
-        ownerAddress: account?.address,
-        allowDemoFallback,
-      })
-
-      if (chainProof.digest) {
-        setChainStatus(
-          `Onchain task anchored: ${chainProof.digest.slice(0, 12)}... running agents.`,
-        )
-      } else {
-        setChainStatus(chainProof.note || 'Demo mode: running agents.')
+      if (!hasVaultDepositConfig()) {
+        throw new Error('Configure the vault package ID and testnet USDC coin type before depositing.')
       }
 
+      const depositAmount = parseAmount(escrowAmount)
+      const vaultDeposit = await executeVaultDepositPTB({
+        dAppKit,
+        ownerAddress: account?.address,
+        amount: depositAmount,
+        taskAnchorAddress: account?.address,
+      })
+
+      setChainStatus(
+        `Vault funded on Sui: ${vaultDeposit.digest.slice(0, 12)}... running agents.`,
+      )
+
       await onLaunch({
+        amount: depositAmount,
+        riskProfile,
+        objectives: objective,
         objective,
         escrowAmount,
-        ownerAddress: account?.address || 'demo-wallet',
-        chainProof,
+        walletAddress: account?.address,
+        ownerAddress: account?.address,
+        chainProof: vaultDeposit,
+        vaultDeposit,
       })
 
       setChainStatus('Workflow complete. Dashboard updated.')
@@ -88,8 +88,16 @@ export function TaskComposer({ error, isRunning, latestTask, onCompleted, onLaun
             <small className="field-hint">Funds injected into the Vault PTB protocol.</small>
           </label>
           <label style={{ fontFamily: 'var(--sans)' }}>
-            Max Slippage
-            <input type="text" defaultValue="0.5%" aria-label="Max Slippage" />
+            Risk Profile
+            <select
+              aria-label="Risk Profile"
+              value={riskProfile}
+              onChange={(event) => setRiskProfile(event.target.value)}
+            >
+              <option value="conservative">Conservative</option>
+              <option value="balanced">Balanced</option>
+              <option value="aggressive">Aggressive</option>
+            </select>
           </label>
         </div>
 
@@ -102,13 +110,19 @@ export function TaskComposer({ error, isRunning, latestTask, onCompleted, onLaun
           {chainStatus ? <p>{chainStatus}</p> : null}
           {latestTask ? (
             <p className="form-success">
-              Portfolio synced {latestTask.id} across {latestTask.workflow.length} agent verifications.
+              Portfolio synced {latestTask.id} across {latestTask.workflowEvents?.length || 0} agent
+              verifications.
             </p>
           ) : (
-            <p>Wallet connection required to deploy to testnet vaults.</p>
+            <p>Wallet connection and testnet USDC are required to fund the vault.</p>
           )}
         </div>
       </form>
     </section>
   )
+}
+
+function parseAmount(value) {
+  const amount = Number.parseFloat(String(value).replace(/[^0-9.]/g, ''))
+  return Number.isFinite(amount) && amount > 0 ? amount : 0
 }

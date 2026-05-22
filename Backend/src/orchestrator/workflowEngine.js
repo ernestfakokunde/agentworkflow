@@ -70,12 +70,12 @@ export const workflowEngine = {
       const validationOutput = await runAgent('Validation Agent', validationPrompt)
 
       // Step 4: Deployment
-      console.log('🚀 Step 4: Deployment Agent preparing transaction...')
+      console.log('🚀 Step 4: Deployment Agent preparing strategy from funded vault...')
       const deployment = await deployPortfolioAllocation(
         task.id,
         task.amount,
         strategyOutput,
-        process.env.ESCROW_COIN_ID || '0x1::sui::SUI',
+        task.vaultDeposit?.digest,
         process.env.PORTFOLIO_VAULT_PACKAGE_ID
       )
 
@@ -88,7 +88,7 @@ export const workflowEngine = {
 
       console.log(`✅ Workflow complete for task ${task.id}`)
       console.log(`📊 Allocation: ${JSON.stringify(deployment.allocations)}`)
-      console.log('✋ READY FOR WALLET SIGNATURE')
+      console.log(`✋ Vault deposit confirmed: ${task.vaultDeposit?.digest}`)
 
       return deployment
     } catch (error) {

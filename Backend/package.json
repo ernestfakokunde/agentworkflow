@@ -1,0 +1,35 @@
+{
+  "name": "aether-backend",
+  "version": "1.0.0",
+  "description": "Aether orchestration API for autonomous agent coordination on Sui.",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js",
+    "demo:flow": "node demo-flow.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "node tests/integration.test.js",
+    "deploy:testnet": "bash ../scripts/setup-testnet.sh"
+  },
+  "keywords": [
+    "sui",
+    "agentic-web",
+    "ai-agents",
+    "walrus"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@mysten/sui": "^1.39.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "vitest": "^1.0.0"
+  }
+}

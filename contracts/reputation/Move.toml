@@ -1,0 +1,7 @@
+[package]
+name = "aether_reputation"
+version = "0.0.1"
+edition = "2024.beta"
+
+[addresses]
+aether_reputation = "0x0"

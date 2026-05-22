@@ -1,0 +1,7 @@
+[package]
+name = "aether_task_manager"
+version = "0.0.1"
+edition = "2024.beta"
+
+[addresses]
+aether_task_manager = "0x0"
